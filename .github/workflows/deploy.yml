@@ -1,0 +1,67 @@
+name: Deploy Stack Completo CI/CD EKS
+
+on:
+  push:
+    branches:
+      - deploy
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 1. Compilar y subir Base de Datos
+      - name: Build and Push DB Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./db-tiendaperritos
+          push: true
+          tags: "${{ secrets.DOCKER_USERNAME }}/tienda-db:latest"
+
+      # 2. Compilar y subir Backend
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend-tiendaperritos
+          push: true
+          tags: "${{ secrets.DOCKER_USERNAME }}/tienda-backend:latest"
+
+      # 3. Compilar y subir Frontend
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend-tiendaperritos
+          push: true
+          tags: "${{ secrets.DOCKER_USERNAME }}/tienda-frontend:latest"
+
+      # 4. Conectarse y configurar AWS
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.35.0'
+
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name tienda-eks-1
+
+      # 5. Reemplazar variables y Desplegar todo el Stack junto
+      - name: Deploy to EKS Cluster
+        run: |
+          sed -i "s|DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/tienda-completa.yaml
+          kubectl apply -f k8s/tienda-completa.yaml
