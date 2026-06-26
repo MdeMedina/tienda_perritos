@@ -8,9 +8,10 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: gp2 # <--- Inyectado para forzar la entrega del volumen EBS en AWS Academy
   resources:
     requests:
-      storage: 1Gi # EKS Auto Mode creará un volumen EBS dinámicamente
+      storage: 1Gi 
 ---
 apiVersion: apps/v1
 kind: Deployment
